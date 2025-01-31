@@ -5,7 +5,10 @@ import re  # Librería para detectar comandos con expresiones regulares
 from datetime import datetime
 import os
 # Configuración de OpenRouter con el modelo LFM-7B
-print("🔍 OPENAI_API_KEY:", os.getenv("OPENAI_API_KEY"))
+
+# Imprimir API Key para verificar si se está pasando correctamente
+api_key = os.getenv("OPENAI_API_KEY")
+print(f"🔍 OPENAI_API_KEY: {api_key}")
 
 client = openai.OpenAI(
     api_key=os.getenv("OPENAI_API_KEY"),
