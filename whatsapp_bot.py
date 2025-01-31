@@ -11,7 +11,7 @@ api_key = os.getenv("OPENAI_API_KEY")
 print(f"🔍 OPENAI_API_KEY: {api_key}")
 
 client = openai.OpenAI(
-    api_key=os.getenv("OPENAI_API_KEY"),
+    api_key=api_key,
     base_url="https://openrouter.ai/api/v1"
 )
 
