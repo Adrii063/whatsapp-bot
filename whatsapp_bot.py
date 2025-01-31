@@ -6,9 +6,7 @@ from datetime import datetime
 import os
 # Configuración de OpenRouter con el modelo LFM-7B
 
-# Imprimir API Key para verificar si se está pasando correctamente
-api_key = os.getenv("OPENAI_API_KEY")
-print(f"🔍 OPENAI_API_KEY: {api_key}")
+print("🔍 OPENAI_API_KEY en Flask:", os.getenv("OPENAI_API_KEY"))
 
 client = openai.OpenAI(
     api_key=api_key,
