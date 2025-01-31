@@ -3,12 +3,15 @@ from twilio.twiml.messaging_response import MessagingResponse
 import openai
 import re  # Librería para detectar comandos con expresiones regulares
 from datetime import datetime
-
+import os
 # Configuración de OpenRouter con el modelo LFM-7B
+
+
 client = openai.OpenAI(
-    api_key="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",
+    api_key=os.getenv("OPENAI_API_KEY"),
     base_url="https://openrouter.ai/api/v1"
 )
+
 
 app = Flask(__name__)
 
