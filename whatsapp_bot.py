@@ -14,8 +14,7 @@ if not api_key:
 
 # Configuración de OpenRouter con el modelo LFM-7B
 client = openai.OpenAI(
-    api_key=api_key,
-    base_url="https://openrouter.ai/api/v1"
+    api_key=os.getenv("OPENAI_API_KEY"),  # 🔥 Asegura que se obtiene directamente de la variable de entorno
 )
 
 app = Flask(__name__)
