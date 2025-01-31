@@ -22,7 +22,6 @@ def chat_with_ai(user_input, user_id):
     if user_id not in user_conversations:
         user_conversations[user_id] = [
             {"role": "system", "content": "Eres un recepcionista del restaurante 'La Terraza'. "
-                                          "Responde de manera corta y precisa, no más de 2 frases. "
                                           "Tu trabajo es ayudar con reservas, responder preguntas "
                                           "sobre el menú, horarios y cualquier otra duda."},
             {"role": "assistant", "content": WELCOME_MESSAGE}
@@ -40,6 +39,11 @@ def chat_with_ai(user_input, user_id):
     if response.choices and response.choices[0].message:
         bot_response = response.choices[0].message.content
         user_conversations[user_id].append({"role": "assistant", "content": bot_response})
+
+        # 🔹 Bloquear respuestas que digan que no puede ver reservas
+        if "no tengo acceso" in bot_response.lower() or "no puedo ver tus reservas" in bot_response.lower():
+            return "Si deseas revisar tus reservas activas, dime '¿Tengo alguna reserva?' y te diré los detalles."
+
         return bot_response
     
     return "Lo siento, no tengo una respuesta en este momento. ¿Puedo ayudarte en algo más?"
@@ -81,7 +85,6 @@ def handle_reservation(user_input, user_id):
         confirmation_msg = f"✅ Reserva confirmada para el {reservation_data['date']} "\
                            f"a las {reservation_data['time']} para {reservation_data['people']} personas. "\
                            f"¡Te esperamos en *La Terraza*! 🎉"
-        user_reservations.pop(user_id, None)  # 🔹 Eliminamos la reserva después de confirmarla
         return confirmation_msg
     
     return None
@@ -89,11 +92,24 @@ def handle_reservation(user_input, user_id):
 @app.route("/whatsapp", methods=["POST"])
 def whatsapp_reply():
     """Manejar mensajes de WhatsApp y detectar reservas y comandos automáticamente"""
-    incoming_msg = request.values.get("Body", "").strip()
+    incoming_msg = request.values.get("Body", "").strip().lower()
     user_id = request.values.get("From", "")
 
+    # ✅ Si el usuario pregunta por sus reservas activas
+    if "qué reservas tengo" in incoming_msg or "tengo alguna reserva" in incoming_msg:
+        if user_id in user_reservations and all(user_reservations[user_id].values()):
+            res = user_reservations[user_id]
+            response_text = f"Tienes una reserva para el {res['date']} a las {res['time']} para {res['people']} personas. 😊"
+        else:
+            response_text = "No tienes ninguna reserva activa en este momento."
+
+        resp = MessagingResponse()
+        resp.message(response_text)
+        return str(resp)
+
+    # ✅ Cancelar reserva
     cancel_phrases = ["cancelar", "cancela", "anular", "eliminar reserva", "borra la reserva"]
-    if any(phrase in incoming_msg.lower() for phrase in cancel_phrases):
+    if any(phrase in incoming_msg for phrase in cancel_phrases):
         if user_id in user_reservations:
             del user_reservations[user_id]
             response_text = "❌ Tu reserva ha sido cancelada correctamente."
@@ -104,7 +120,8 @@ def whatsapp_reply():
         resp.message(response_text)
         return str(resp)
 
-    if "reservar" in incoming_msg.lower() or "quiero una mesa" in incoming_msg.lower():
+    # ✅ Hacer una nueva reserva
+    if "reservar" in incoming_msg or "quiero una mesa" in incoming_msg:
         reservation_response = handle_reservation(incoming_msg, user_id)
         if reservation_response:
             response_text = reservation_response
@@ -115,6 +132,7 @@ def whatsapp_reply():
         resp.message(response_text)
         return str(resp)
 
+    # ✅ Conversación normal con la IA
     response_text = chat_with_ai(incoming_msg, user_id)
     resp = MessagingResponse()
     resp.message(response_text)
