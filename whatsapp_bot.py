@@ -17,6 +17,13 @@ client = openai.OpenAI(
     api_key=os.getenv("OPENAI_API_KEY"),  # 🔥 Asegura que se obtiene directamente de la variable de entorno
 )
 
+print(f"🔍 Probando conexión con OpenRouter...")
+try:
+    test_response = client.models.list()
+    print(f"✅ Conexión exitosa, modelos disponibles: {[model.id for model in test_response.data]}")
+except Exception as e:
+    print(f"❌ Error en la conexión con OpenRouter: {str(e)}")
+
 app = Flask(__name__)
 
 @app.route("/")
