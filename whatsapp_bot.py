@@ -103,6 +103,7 @@ def handle_reservation(user_input, user_id):
 
 @app.route("/whatsapp", methods=["POST"])
 def whatsapp_reply():
+    print("🔍 OPENAI_API_KEY:", os.getenv("OPENAI_API_KEY"))
     """Manejar mensajes de WhatsApp y detectar reservas y comandos automáticamente"""
     incoming_msg = request.values.get("Body", "").strip()
     user_id = request.values.get("From", "")
