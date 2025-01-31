@@ -5,13 +5,12 @@ import re  # Librería para detectar comandos con expresiones regulares
 from datetime import datetime
 import os
 # Configuración de OpenRouter con el modelo LFM-7B
-
+print("🔍 OPENAI_API_KEY:", os.getenv("OPENAI_API_KEY"))
 
 client = openai.OpenAI(
     api_key=os.getenv("OPENAI_API_KEY"),
     base_url="https://openrouter.ai/api/v1"
 )
-
 
 app = Flask(__name__)
 @app.route("/")
@@ -103,7 +102,6 @@ def handle_reservation(user_input, user_id):
 
 @app.route("/whatsapp", methods=["POST"])
 def whatsapp_reply():
-    print("🔍 OPENAI_API_KEY:", os.getenv("OPENAI_API_KEY"))
     """Manejar mensajes de WhatsApp y detectar reservas y comandos automáticamente"""
     incoming_msg = request.values.get("Body", "").strip()
     user_id = request.values.get("From", "")
