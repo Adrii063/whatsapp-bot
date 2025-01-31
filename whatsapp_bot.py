@@ -1,23 +1,16 @@
 from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
 import openai
-import re  # Librería para detectar comandos con expresiones regulares
+import re
 import os
 
 # Configuración de OpenRouter con el modelo LFM-7B
 api_key = os.getenv("OPENAI_API_KEY")
-client = openai.OpenAI(
-    api_key=api_key,
-    base_url="https://openrouter.ai/api/v1"
-)
+client = openai.OpenAI(api_key=api_key, base_url="https://openrouter.ai/api/v1")
 
 app = Flask(__name__)
 
-@app.route("/")
-def home():
-    return "¡El bot está funcionando! Usa /whatsapp para interactuar."
-
-# Diccionarios para gestionar conversaciones y reservas
+# Diccionarios para manejar múltiples usuarios
 user_conversations = {}
 user_reservations = {}
 
@@ -25,13 +18,13 @@ WELCOME_MESSAGE = "¡Hola! Soy el asistente virtual de *Restaurante La Terraza* 
                   "Puedes preguntarme sobre el menú, reservar una mesa o conocer nuestros horarios."
 
 def chat_with_ai(user_input, user_id):
-    """Obtiene una respuesta de LFM-7B con memoria y lógica de recepcionista"""
+    """Maneja la conversación personalizada para cada usuario"""
     if user_id not in user_conversations:
         user_conversations[user_id] = [
             {"role": "system", "content": "Eres un recepcionista del restaurante 'La Terraza'. "
-                                             "Responde de manera corta y precisa, no más de 2 frases. "
-                                             "Tu trabajo es ayudar con reservas, responder preguntas "
-                                             "sobre el menú, horarios y cualquier otra duda."},
+                                          "Responde de manera corta y precisa, no más de 2 frases. "
+                                          "Tu trabajo es ayudar con reservas, responder preguntas "
+                                          "sobre el menú, horarios y cualquier otra duda."},
             {"role": "assistant", "content": WELCOME_MESSAGE}
         ]
     
@@ -52,7 +45,7 @@ def chat_with_ai(user_input, user_id):
     return "Lo siento, no tengo una respuesta en este momento. ¿Puedo ayudarte en algo más?"
 
 def extract_reservation_details(message):
-    """Extrae fecha, hora y número de personas de un mensaje de reserva"""
+    """Extrae la fecha, hora y número de personas de un mensaje de reserva"""
     date_match = re.search(r'(\d{1,2}/\d{1,2})|(\d{1,2} de [a-zA-Z]+)', message)
     time_match = re.search(r'(\d{1,2}[:h]\d{2})|(\d{1,2} (?:AM|PM|am|pm))', message)
     people_match = re.search(r'(\d+)\s*(?:personas?|somos|para)', message)
@@ -64,7 +57,7 @@ def extract_reservation_details(message):
     return date_str, time_str, people_count
 
 def handle_reservation(user_input, user_id):
-    """Maneja el flujo de reservas asegurando que se recopilen todos los datos antes de confirmar."""
+    """Gestiona reservas asegurando que cada usuario tenga su propia sesión"""
     if user_id not in user_reservations:
         user_reservations[user_id] = {"date": None, "time": None, "people": None}
 
@@ -88,7 +81,7 @@ def handle_reservation(user_input, user_id):
         confirmation_msg = f"✅ Reserva confirmada para el {reservation_data['date']} "\
                            f"a las {reservation_data['time']} para {reservation_data['people']} personas. "\
                            f"¡Te esperamos en *La Terraza*! 🎉"
-        user_reservations.pop(user_id, None)
+        user_reservations.pop(user_id, None)  # 🔹 Eliminamos la reserva después de confirmarla
         return confirmation_msg
     
     return None
@@ -128,5 +121,5 @@ def whatsapp_reply():
     return str(resp)
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 5000))  # Render asigna un puerto dinámicamente
     app.run(host="0.0.0.0", port=port)
