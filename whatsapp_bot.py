@@ -14,6 +14,9 @@ client = openai.OpenAI(
 
 
 app = Flask(__name__)
+@app.route("/")
+def home():
+    return "¡El bot está funcionando! Usa /whatsapp para interactuar."
 
 # Diccionario para almacenar el historial de conversaciones y reservas
 user_conversations = {}
