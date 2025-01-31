@@ -1,28 +1,15 @@
 from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
 import openai
-import re
-from datetime import datetime
+import re  # Librería para detectar comandos con expresiones regulares
 import os
 
-# 📌 Verificamos que la API Key se ha obtenido correctamente
-api_key = os.getenv("OPENAI_API_KEY")
-print(f"🔍 OPENAI_API_KEY en Flask: {api_key}")
-
-if not api_key:
-    print("⚠️ ERROR: No se encontró la API Key en las variables de entorno. Verifica en Render.")
-
 # Configuración de OpenRouter con el modelo LFM-7B
+api_key = os.getenv("OPENAI_API_KEY")
 client = openai.OpenAI(
-    api_key=os.getenv("OPENAI_API_KEY"),  # 🔥 Asegura que se obtiene directamente de la variable de entorno
+    api_key=api_key,
+    base_url="https://openrouter.ai/api/v1"")
 )
-
-print(f"🔍 Probando conexión con OpenRouter...")
-try:
-    test_response = client.models.list()
-    print(f"✅ Conexión exitosa, modelos disponibles: {[model.id for model in test_response.data]}")
-except Exception as e:
-    print(f"❌ Error en la conexión con OpenRouter: {str(e)}")
 
 app = Flask(__name__)
 
@@ -30,7 +17,7 @@ app = Flask(__name__)
 def home():
     return "¡El bot está funcionando! Usa /whatsapp para interactuar."
 
-# Diccionario para almacenar el historial de conversaciones y reservas
+# Diccionarios para gestionar conversaciones y reservas
 user_conversations = {}
 user_reservations = {}
 
@@ -38,56 +25,43 @@ WELCOME_MESSAGE = "¡Hola! Soy el asistente virtual de *Restaurante La Terraza* 
                   "Puedes preguntarme sobre el menú, reservar una mesa o conocer nuestros horarios."
 
 def chat_with_ai(user_input, user_id):
-    """Función para obtener una respuesta de LFM-7B con memoria y lógica de recepcionista"""
-    try:
-        print(f"🤖 Procesando mensaje del usuario {user_id} con la IA...")
-
-        if user_id not in user_conversations:
-            user_conversations[user_id] = [
-                {"role": "system", "content": "Eres un recepcionista del restaurante 'La Terraza'. "
-                                              "Responde de manera corta y precisa, no más de 2 frases. "
-                                              "Tu trabajo es ayudar con reservas, responder preguntas "
-                                              "sobre el menú, horarios y cualquier otra duda."},
-                {"role": "assistant", "content": WELCOME_MESSAGE}
-            ]
-        
-        user_conversations[user_id].append({"role": "user", "content": user_input})
-
-        response = client.chat.completions.create(
-            model="liquid/lfm-7b",
-            messages=user_conversations[user_id],
-            max_tokens=300,
-            temperature=0.7
-        )
-
-        if response.choices and response.choices[0].message:
-            bot_response = response.choices[0].message.content
-            user_conversations[user_id].append({"role": "assistant", "content": bot_response})
-            print(f"📤 Respuesta de la IA: {bot_response}")
-            return bot_response
-        
-        print("⚠️ La IA no generó una respuesta válida.")
-        return "Lo siento, no tengo una respuesta en este momento. ¿Puedo ayudarte en algo más?"
+    """Obtiene una respuesta de LFM-7B con memoria y lógica de recepcionista"""
+    if user_id not in user_conversations:
+        user_conversations[user_id] = [
+            {"role": "system", "content": "Eres un recepcionista del restaurante 'La Terraza'. "
+                                             "Responde de manera corta y precisa, no más de 2 frases. "
+                                             "Tu trabajo es ayudar con reservas, responder preguntas "
+                                             "sobre el menú, horarios y cualquier otra duda."},
+            {"role": "assistant", "content": WELCOME_MESSAGE}
+        ]
     
-    except Exception as e:
-        error_msg = f"⚠️ Error en la IA: {str(e)}"
-        print(error_msg)
-        return "Hubo un error procesando tu solicitud, inténtalo más tarde."
+    user_conversations[user_id].append({"role": "user", "content": user_input})
+
+    response = client.chat.completions.create(
+        model="liquid/lfm-7b",
+        messages=user_conversations[user_id],
+        max_tokens=300,
+        temperature=0.7
+    )
+
+    if response.choices and response.choices[0].message:
+        bot_response = response.choices[0].message.content
+        user_conversations[user_id].append({"role": "assistant", "content": bot_response})
+        return bot_response
+    
+    return "Lo siento, no tengo una respuesta en este momento. ¿Puedo ayudarte en algo más?"
 
 def extract_reservation_details(message):
-    """Extrae la fecha, hora y número de personas de un mensaje de reserva"""
-    try:
-        date_match = re.search(r'(\d{1,2}/\d{1,2})|(\d{1,2} de [a-zA-Z]+)', message)
-        time_match = re.search(r'(\d{1,2}[:h]\d{2})|(\d{1,2} (?:AM|PM|am|pm))', message)
-        people_match = re.search(r'(\d+)\s*(?:personas?|somos|para)', message)
+    """Extrae fecha, hora y número de personas de un mensaje de reserva"""
+    date_match = re.search(r'(\d{1,2}/\d{1,2})|(\d{1,2} de [a-zA-Z]+)', message)
+    time_match = re.search(r'(\d{1,2}[:h]\d{2})|(\d{1,2} (?:AM|PM|am|pm))', message)
+    people_match = re.search(r'(\d+)\s*(?:personas?|somos|para)', message)
 
-        date_str = date_match.group(0) if date_match else None
-        time_str = time_match.group(0) if time_match else None
-        people_count = people_match.group(1) if people_match else None
+    date_str = date_match.group(0) if date_match else None
+    time_str = time_match.group(0) if time_match else None
+    people_count = people_match.group(1) if people_match else None
 
-        return date_str, time_str, people_count
-    except Exception:
-        return None, None, None
+    return date_str, time_str, people_count
 
 def handle_reservation(user_input, user_id):
     """Maneja el flujo de reservas asegurando que se recopilen todos los datos antes de confirmar."""
@@ -122,54 +96,37 @@ def handle_reservation(user_input, user_id):
 @app.route("/whatsapp", methods=["POST"])
 def whatsapp_reply():
     """Manejar mensajes de WhatsApp y detectar reservas y comandos automáticamente"""
-    try:
-        incoming_msg = request.values.get("Body", "").strip()
-        user_id = request.values.get("From", "")
+    incoming_msg = request.values.get("Body", "").strip()
+    user_id = request.values.get("From", "")
 
-        print(f"📩 Mensaje recibido de {user_id}: {incoming_msg}")
-
-        cancel_phrases = ["cancelar", "cancela", "anular", "eliminar reserva", "borra la reserva"]
-        if any(phrase in incoming_msg.lower() for phrase in cancel_phrases):
-            if user_id in user_reservations:
-                del user_reservations[user_id]
-                response_text = "❌ Tu reserva ha sido cancelada correctamente."
-            else:
-                response_text = "⚠️ No tienes ninguna reserva activa para cancelar."
-
-            print(f"📤 Respuesta enviada a Twilio: {response_text}")
-            resp = MessagingResponse()
-            resp.message(response_text)
-            return str(resp)
-
-        if "reservar" in incoming_msg.lower() or "quiero una mesa" in incoming_msg.lower():
-            reservation_response = handle_reservation(incoming_msg, user_id)
-            if reservation_response:
-                response_text = reservation_response
-            else:
-                response_text = "¿Podrías darme más detalles sobre la reserva?"
-
-            print(f"📤 Respuesta enviada a Twilio: {response_text}")
-            resp = MessagingResponse()
-            resp.message(response_text)
-            return str(resp)
-
-        response_text = chat_with_ai(incoming_msg, user_id)
-
-        if not response_text:
-            response_text = "Lo siento, no entendí tu mensaje. ¿Puedes repetirlo?"
-
-        print(f"📤 Respuesta enviada a Twilio: {response_text}")
-
+    cancel_phrases = ["cancelar", "cancela", "anular", "eliminar reserva", "borra la reserva"]
+    if any(phrase in incoming_msg.lower() for phrase in cancel_phrases):
+        if user_id in user_reservations:
+            del user_reservations[user_id]
+            response_text = "❌ Tu reserva ha sido cancelada correctamente."
+        else:
+            response_text = "⚠️ No tienes ninguna reserva activa para cancelar."
+        
         resp = MessagingResponse()
         resp.message(response_text)
         return str(resp)
 
-    except Exception as e:
-        error_message = f"⚠️ Error en whatsapp_reply(): {str(e)}"
-        print(error_message)
-        return str(MessagingResponse().message("Hubo un error en el servidor, inténtalo más tarde."))
+    if "reservar" in incoming_msg.lower() or "quiero una mesa" in incoming_msg.lower():
+        reservation_response = handle_reservation(incoming_msg, user_id)
+        if reservation_response:
+            response_text = reservation_response
+        else:
+            response_text = "¿Podrías darme más detalles sobre la reserva?"
+        
+        resp = MessagingResponse()
+        resp.message(response_text)
+        return str(resp)
+
+    response_text = chat_with_ai(incoming_msg, user_id)
+    resp = MessagingResponse()
+    resp.message(response_text)
+    return str(resp)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    print(f"🚀 Iniciando el servidor en el puerto {port}")
     app.run(host="0.0.0.0", port=port)
