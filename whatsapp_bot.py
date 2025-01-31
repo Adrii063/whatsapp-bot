@@ -8,8 +8,10 @@ import os
 
 print("🔍 OPENAI_API_KEY en Flask:", os.getenv("OPENAI_API_KEY"))
 
+api_key = os.getenv("OPENAI_API_KEY")  # 🔹 Asegura que la variable se defina correctamente
+
 client = openai.OpenAI(
-    api_key=api_key,
+    api_key=api_key,  # ✅ Ahora "api_key" está correctamente definida
     base_url="https://openrouter.ai/api/v1"
 )
 
