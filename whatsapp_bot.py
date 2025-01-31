@@ -109,6 +109,8 @@ def whatsapp_reply():
     incoming_msg = request.values.get("Body", "").strip()
     user_id = request.values.get("From", "")
 
+    print(f"📩 Mensaje recibido de {user_id}: {incoming_msg}")  # Debugging
+
     cancel_phrases = ["cancelar", "cancela", "anular", "eliminar reserva", "borra la reserva"]
     if any(phrase in incoming_msg.lower() for phrase in cancel_phrases):
         if user_id in user_reservations:
@@ -116,6 +118,8 @@ def whatsapp_reply():
             response_text = "❌ Tu reserva ha sido cancelada correctamente."
         else:
             response_text = "⚠️ No tienes ninguna reserva activa para cancelar."
+
+        print(f"📤 Respuesta enviada a Twilio: {response_text}")  # Debugging
         resp = MessagingResponse()
         resp.message(response_text)
         return str(resp)
@@ -126,14 +130,29 @@ def whatsapp_reply():
             response_text = reservation_response
         else:
             response_text = "¿Podrías darme más detalles sobre la reserva?"
+
+        print(f"📤 Respuesta enviada a Twilio: {response_text}")  # Debugging
         resp = MessagingResponse()
         resp.message(response_text)
         return str(resp)
 
-    response_text = chat_with_ai(incoming_msg, user_id)
-    resp = MessagingResponse()
-    resp.message(response_text)
-    return str(resp)
+    try:
+        response_text = chat_with_ai(incoming_msg, user_id)
+        
+        if not response_text:  # Si la respuesta está vacía, enviamos un mensaje por defecto
+            response_text = "Lo siento, no entendí tu mensaje. ¿Puedes repetirlo?"
+
+        print(f"📤 Respuesta enviada a Twilio: {response_text}")  # Debugging
+        
+        resp = MessagingResponse()
+        resp.message(response_text)
+        return str(resp)
+
+    except Exception as e:
+        error_message = f"⚠️ Error en el procesamiento de WhatsApp: {str(e)}"
+        print(error_message)  # Imprime errores en logs
+        return str(MessagingResponse().message("Hubo un error en el servidor, inténtalo más tarde."))
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))  # Render asigna un puerto dinámicamente
