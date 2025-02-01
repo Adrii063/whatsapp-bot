@@ -1,19 +1,55 @@
+import psycopg2
 import logging
-from db import db
+import os
+from dotenv import load_dotenv
+
+# Cargar variables de entorno
+load_dotenv()
+
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 class ReservationManager:
     def __init__(self):
-        logging.info("🔹 Manejador de reservas inicializado")
+        self.conn = psycopg2.connect(DATABASE_URL)
+        self.cursor = self.conn.cursor()
+        self.create_table()
 
-    def handle_reservation(self, user_id, date, time, people):
-        """Guarda la reserva en la base de datos"""
+    def create_table(self):
+        """Crea la tabla si no existe."""
+        self.cursor.execute("""
+        CREATE TABLE IF NOT EXISTS reservations (
+            id SERIAL PRIMARY KEY,
+            user_id TEXT UNIQUE NOT NULL,
+            fecha TEXT NOT NULL,
+            hora TEXT NOT NULL,
+            personas INTEGER NOT NULL
+        )
+        """)
+        self.conn.commit()
+        logging.info("✅ Tabla de reservas verificada/creada.")
+
+    def add_reservation(self, user_id, fecha, hora, personas):
+        """Añade una nueva reserva a la base de datos."""
         try:
-            logging.info(f"📝 Intentando agregar reserva para {user_id}: {date} {time}, {people} personas")
-            db.add_reservation(user_id, date, time, people)
-            logging.info(f"✅ Reserva guardada correctamente para {user_id}")
-            return f"Reserva confirmada: {date} a las {time} para {people} personas."
+            self.cursor.execute("""
+                INSERT INTO reservations (user_id, fecha, hora, personas)
+                VALUES (%s, %s, %s, %s)
+            """, (user_id, fecha, hora, personas))
+            self.conn.commit()
+            logging.info(f"📌 Reserva añadida con éxito para {user_id}: {fecha} a las {hora}, {personas} personas.")
+        except psycopg2.IntegrityError:
+            self.conn.rollback()
+            logging.error("❌ Ya existe una reserva para este usuario.")
+            raise Exception("Este usuario ya tiene una reserva.")
         except Exception as e:
-            logging.error(f"❌ ERROR al guardar reserva en DB: {e}")
-            return "Hubo un problema con tu reserva, intenta más tarde."
+            self.conn.rollback()
+            logging.error(f"❌ Error al añadir la reserva: {e}")
+            raise e
 
+    def close_connection(self):
+        """Cierra la conexión con la base de datos."""
+        self.cursor.close()
+        self.conn.close()
+
+# Instancia global del manejador de reservas
 reservation_manager = ReservationManager()
