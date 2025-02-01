@@ -20,6 +20,9 @@ if not api_key:
 # Inicializar Flask
 app = Flask(__name__)
 
+# 🔹 Diccionario global para almacenar reservas temporales antes de confirmar
+user_data = {}
+
 @app.route("/")
 def home():
     logging.debug("✅ Endpoint '/' ha sido accedido")
