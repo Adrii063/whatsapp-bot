@@ -30,7 +30,7 @@ def chat_with_ai(user_input, user_id):
     user_conversations[user_id].append({"role": "user", "content": user_input})
 
     response = client.chat.completions.create(
-        model="liquid/lfm-7b",
+        model="deepseek/deepseek-r1:free",
         messages=user_conversations[user_id],
         max_tokens=300,
         temperature=0.7
