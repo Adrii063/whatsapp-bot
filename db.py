@@ -12,9 +12,9 @@ class Database:
             self.conn = psycopg2.connect(os.getenv("DATABASE_URL"), cursor_factory=RealDictCursor)
             self.cur = self.conn.cursor()
             self.create_table()
-            print("✅ Conexión con la base de datos establecida correctamente.")
+            print("✅ Conexión exitosa a la base de datos.")  # 🔍 Debug
         except Exception as e:
-            print(f"❌ Error al conectar a la base de datos: {e}")
+            print(f"❌ Error al conectar a la base de datos: {e}")  # 🔍 Debug
 
     def create_table(self):
         """Crea la tabla de reservas si no existe."""
@@ -31,13 +31,18 @@ class Database:
 
     def add_reservation(self, user_id, date, time, people):
         """Agrega una nueva reserva en la base de datos."""
-        self.cur.execute("""
-            INSERT INTO reservations (user_id, date, time, people) 
-            VALUES (%s, %s, %s, %s)
-            ON CONFLICT (user_id) DO UPDATE 
-            SET date = EXCLUDED.date, time = EXCLUDED.time, people = EXCLUDED.people;
-        """, (user_id, date, time, people))
-        self.conn.commit()
+        print(f"📝 Intentando agregar reserva: user_id={user_id}, date={date}, time={time}, people={people}")  # 🔍 Debug
+        try:
+            self.cur.execute("""
+                INSERT INTO reservations (user_id, date, time, people) 
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (user_id) DO UPDATE 
+                SET date = EXCLUDED.date, time = EXCLUDED.time, people = EXCLUDED.people;
+            """, (user_id, date, time, people))
+            self.conn.commit()
+            print("✅ Reserva guardada exitosamente en la base de datos.")  # 🔍 Debug
+        except Exception as e:
+            print(f"❌ Error al guardar reserva: {e}")  # 🔍 Debug
 
     def get_reservation(self, user_id):
         """Obtiene una reserva de un usuario."""
