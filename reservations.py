@@ -33,3 +33,7 @@ class ReservationManager:
         return "Necesito más detalles para completar la reserva."
 
 reservation_manager = ReservationManager()
+
+# 🔹 Exportar la función y las reservas activas
+handle_reservation = reservation_manager.handle_reservation
+user_reservations = reservation_manager.user_reservations
