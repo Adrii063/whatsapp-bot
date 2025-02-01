@@ -1,11 +1,11 @@
 import logging
 import re
 import json
+import os
+import requests
 from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
 from dotenv import load_dotenv
-import os
-import openai
 from reservations import reservation_manager
 
 # Configurar logging
@@ -13,34 +13,47 @@ logging.basicConfig(level=logging.DEBUG)
 
 # Cargar variables de entorno
 load_dotenv()
-api_key = os.getenv("OPENAI_API_KEY")
-openai.api_key = api_key
+api_key = os.getenv("OPENAI_API_KEY")  # SE MANTIENE IGUAL
 
 # Inicializar Flask
 app = Flask(__name__)
 
 def extract_reservation_details(incoming_msg):
-    """Usa GPT para estructurar la información de una reserva"""
+    """Utiliza OpenRouter GPT-4o para extraer detalles de la reserva en JSON."""
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
     prompt = f"""
-    Eres un asistente que extrae detalles de reservas en un restaurante.
-    Extrae los siguientes datos del mensaje y devuélvelos en formato JSON:
-    - Fecha de la reserva
-    - Hora
-    - Número de personas
+    Eres un asistente para extraer datos de reservas de restaurante.
+    Extrae los siguientes detalles del mensaje y devuelve un JSON válido con los campos:
+    - fecha
+    - hora
+    - personas
 
-    Si algún dato no está presente, usa `null`.  
+    Si no encuentra alguno de estos datos, usa `null`.
+
     Mensaje: "{incoming_msg}"
     """
+    data = {
+        "model": "openai/gpt-4o",
+        "messages": [{"role": "system", "content": "Eres un asistente que extrae datos de reservas."},
+                     {"role": "user", "content": prompt}],
+        "max_tokens": 100
+    }
 
-    response = openai.ChatCompletion.create(
-        model="gpt-4o",
-        messages=[{"role": "system", "content": "Eres un asistente experto en estructurar reservas de restaurantes."},
-                  {"role": "user", "content": prompt}],
-        max_tokens=100
-    )
-
-    structured_data = json.loads(response["choices"][0]["message"]["content"])
-    return structured_data
+    response = requests.post(url, headers=headers, json=data)
+    if response.status_code == 200:
+        try:
+            structured_data = json.loads(response.json()["choices"][0]["message"]["content"])
+            return structured_data
+        except json.JSONDecodeError:
+            logging.error("❌ Error en la respuesta de OpenRouter: No es JSON válido.")
+            return {"fecha": None, "hora": None, "personas": None}
+    else:
+        logging.error(f"❌ Error en la API de OpenRouter: {response.text}")
+        return {"fecha": None, "hora": None, "personas": None}
 
 @app.route("/")
 def home():
@@ -50,7 +63,7 @@ def home():
 @app.route("/whatsapp", methods=["POST"])
 def whatsapp_reply():
     """Maneja los mensajes de WhatsApp y gestiona reservas"""
-    incoming_msg = request.values.get("Body", "").strip().lower()
+    incoming_msg = request.values.get("Body", "").strip()
     user_id = request.values.get("From", "")
 
     logging.debug(f"📩 Mensaje recibido de {user_id}: {incoming_msg}")
