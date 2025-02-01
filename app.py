@@ -1,6 +1,28 @@
 import logging
+from flask import Flask, request
+from twilio.twiml.messaging_response import MessagingResponse
+from dotenv import load_dotenv
+import os
+from bot import chat_with_ai
+from reservations import reservation_manager
 
+# Configurar logging para depuración
 logging.basicConfig(level=logging.DEBUG)
+
+# Cargar variables de entorno
+load_dotenv()
+api_key = os.getenv("OPENAI_API_KEY")
+
+if not api_key:
+    raise ValueError("❌ ERROR: La variable de entorno OPENAI_API_KEY no está configurada.")
+
+# Inicializar Flask
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    logging.debug("✅ Endpoint '/' ha sido accedido")
+    return "✅ El bot está funcionando correctamente. Usa /whatsapp para interactuar."
 
 @app.route("/whatsapp", methods=["POST"])
 def whatsapp_reply():
@@ -22,3 +44,8 @@ def whatsapp_reply():
     logging.debug(f"📤 Respuesta enviada a {user_id}: {response_text}")
     resp.message(response_text)
     return str(resp)
+
+if __name__ == "__main__":
+    port = int(os.getenv("PORT", 5000))
+    logging.info(f"🚀 Servidor iniciado en el puerto {port}")
+    app.run(host="0.0.0.0", port=port)
