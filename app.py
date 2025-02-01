@@ -43,16 +43,28 @@ def extract_reservation_details(incoming_msg):
         "max_tokens": 100
     }
 
-    response = requests.post(url, headers=headers, json=data)
-    if response.status_code == 200:
-        try:
-            structured_data = json.loads(response.json()["choices"][0]["message"]["content"])
-            return structured_data
-        except json.JSONDecodeError:
-            logging.error("❌ Error en la respuesta de OpenRouter: No es JSON válido.")
+    try:
+        response = requests.post(url, headers=headers, json=data)
+        response.raise_for_status()  # Lanza un error si la solicitud no es exitosa
+        response_json = response.json()
+
+        # Verifica si la respuesta contiene "choices" y extrae el JSON generado por la IA
+        if "choices" in response_json and response_json["choices"]:
+            message_content = response_json["choices"][0]["message"]["content"].strip()
+            logging.debug(f"📩 Respuesta de OpenRouter: {message_content}")
+
+            # Intentar convertir la respuesta a JSON
+            try:
+                structured_data = json.loads(message_content)
+                return structured_data
+            except json.JSONDecodeError:
+                logging.error("❌ Error en la respuesta de OpenRouter: No es JSON válido.")
+                return {"fecha": None, "hora": None, "personas": None}
+        else:
+            logging.error("❌ Respuesta de OpenRouter vacía o inesperada.")
             return {"fecha": None, "hora": None, "personas": None}
-    else:
-        logging.error(f"❌ Error en la API de OpenRouter: {response.text}")
+    except requests.exceptions.RequestException as e:
+        logging.error(f"❌ Error en la API de OpenRouter: {e}")
         return {"fecha": None, "hora": None, "personas": None}
 
 @app.route("/")
