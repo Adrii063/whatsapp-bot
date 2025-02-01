@@ -1,6 +1,6 @@
 import os
-import psycopg2
 import logging
+import psycopg2
 from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
 
@@ -10,16 +10,17 @@ load_dotenv()
 class Database:
     def __init__(self):
         try:
-            DATABASE_URL = os.getenv("DATABASE_URL")
-
-            if not DATABASE_URL:
-                raise ValueError("❌ ERROR: La variable de entorno DATABASE_URL no está configurada.")
-
-            self.conn = psycopg2.connect(DATABASE_URL, sslmode="require")
+            logging.info("🔹 Conectando a la base de datos...")
+            self.conn = psycopg2.connect(
+                dbname=os.getenv("DB_NAME"),
+                user=os.getenv("DB_USER"),
+                password=os.getenv("DB_PASSWORD"),
+                host=os.getenv("DB_HOST"),
+                port=os.getenv("DB_PORT")
+            )
             self.cur = self.conn.cursor(cursor_factory=RealDictCursor)
-            
-            logging.info("✅ Conexión exitosa a la base de datos de Render.")
             self.create_table()
+            logging.info("✅ Conexión exitosa a la base de datos")
         except Exception as e:
             logging.error(f"❌ Error al conectar a la base de datos: {e}")
 
@@ -35,22 +36,17 @@ class Database:
             );
         """)
         self.conn.commit()
-        logging.info("📌 Tabla de reservas asegurada.")
 
     def add_reservation(self, user_id, date, time, people):
         """Agrega una nueva reserva en la base de datos."""
-        logging.info(f"📝 Intentando agregar reserva para {user_id}: {date} {time}, {people} personas")
-        try:
-            self.cur.execute("""
-                INSERT INTO reservations (user_id, date, time, people) 
-                VALUES (%s, %s, %s, %s)
-                ON CONFLICT (user_id) DO UPDATE 
-                SET date = EXCLUDED.date, time = EXCLUDED.time, people = EXCLUDED.people;
-            """, (user_id, date, time, people))
-            self.conn.commit()
-            logging.info("✅ Reserva guardada exitosamente")
-        except Exception as e:
-            logging.error(f"❌ Error al guardar la reserva: {e}")
+        logging.info(f"⚡ Intentando guardar en la BD: {user_id}, {date}, {time}, {people} personas")
+        self.cur.execute("""
+            INSERT INTO reservations (user_id, date, time, people) 
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (user_id) DO UPDATE 
+            SET date = EXCLUDED.date, time = EXCLUDED.time, people = EXCLUDED.people;
+        """, (user_id, date, time, people))
+        self.conn.commit()
 
     def get_reservation(self, user_id):
         """Obtiene una reserva de un usuario."""
@@ -61,15 +57,8 @@ class Database:
 
     def delete_reservation(self, user_id):
         """Elimina la reserva de un usuario."""
+        logging.info(f"🗑️ Eliminando reserva de {user_id}")
         self.cur.execute("DELETE FROM reservations WHERE user_id = %s", (user_id,))
         self.conn.commit()
-        logging.info(f"❌ Reserva eliminada para {user_id}")
 
-    def close_connection(self):
-        """Cierra la conexión con la base de datos."""
-        self.cur.close()
-        self.conn.close()
-        logging.info("🔴 Conexión a la base de datos cerrada.")
-
-# Instancia global de la base de datos
 db = Database()
