@@ -5,6 +5,21 @@ import os
 from bot import chat_with_ai
 from reservations import reservation_manager
 
+import logging
+import sys
+
+logging.info(f"📩 Mensaje recibido: {incoming_msg} de {user_id}")
+
+# ✅ Habilitar logs en Render
+logging.basicConfig(level=logging.INFO, stream=sys.stdout)
+
+# ✅ Forzar que Flask muestre los `print()`
+import os
+if not os.getenv("FLASK_ENV"):  # Si no está en modo desarrollo
+    import sys
+    print = lambda *args, **kwargs: sys.stdout.write(" ".join(map(str, args)) + "\n")
+
+
 # Cargar variables de entorno
 load_dotenv()
 api_key = os.getenv("OPENAI_API_KEY")
@@ -56,4 +71,4 @@ def whatsapp_reply():
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5000))
     print(f"🚀 Servidor iniciado en el puerto {port}")
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=port, debug=True)
