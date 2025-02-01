@@ -1,13 +1,12 @@
 import psycopg2
 import logging
 import os
-from dotenv import load_dotenv
 import re
 from datetime import datetime
+from dotenv import load_dotenv
 
 # Cargar variables de entorno
 load_dotenv()
-
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 class ReservationManager:
@@ -21,7 +20,7 @@ class ReservationManager:
         self.cursor.execute("""
         CREATE TABLE IF NOT EXISTS reservations (
             id SERIAL PRIMARY KEY,
-            user_id TEXT UNIQUE NOT NULL,
+            user_id TEXT NOT NULL,
             date TEXT NOT NULL,
             time TEXT NOT NULL,
             people INTEGER NOT NULL
@@ -38,23 +37,31 @@ class ReservationManager:
                 "mayo": "05", "junio": "06", "julio": "07", "agosto": "08",
                 "septiembre": "09", "octubre": "10", "noviembre": "11", "diciembre": "12"
             }
-            
-            # Verificar si está en formato "D de mes"
+
+            # Caso: "D de mes"
             match = re.match(r"(\d{1,2}) de (\w+)", date_text)
             if match:
                 day, month_text = match.groups()
-                month = meses.get(month_text.lower())
-                year = datetime.now().year  # Año actual
+                month = meses.get(month_text.lower(), "01")
+                year = datetime.now().year
                 return f"{int(day):02d}/{month}/{year}"
 
-            # Verificar si está en formato "D/M"
+            # Caso: "D/M" o "DD/MM"
             match = re.match(r"(\d{1,2})/(\d{1,2})", date_text)
             if match:
                 day, month = match.groups()
-                year = datetime.now().year  # Año actual
+                year = datetime.now().year
                 return f"{int(day):02d}/{int(month):02d}/{year}"
 
-            return date_text  # Si ya está bien, lo dejamos igual
+            # Caso: "D mes" (sin "de")
+            match = re.match(r"(\d{1,2}) (\w+)", date_text)
+            if match:
+                day, month_text = match.groups()
+                month = meses.get(month_text.lower(), "01")
+                year = datetime.now().year
+                return f"{int(day):02d}/{month}/{year}"
+
+            return date_text  # Si no coincide con ningún formato, devolver sin cambios
 
         except Exception as e:
             logging.error(f"❌ Error al normalizar la fecha: {e}")
