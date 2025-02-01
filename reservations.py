@@ -1,35 +1,43 @@
-import re
+from db import db
 
 class ReservationManager:
-    def __init__(self):
-        self.user_reservations = {}
+    def handle_reservation(self, user_id, message):
+        """Procesa una nueva reserva basada en el mensaje del usuario."""
+        date, time, people = self.extract_details(message)
+
+        if not date or not time or not people:
+            return "Necesito más detalles para completar la reserva (fecha, hora y número de personas)."
+
+        db.add_reservation(user_id, date, time, people)
+        return f"✅ Reserva confirmada para el {date} a las {time} para {people} personas."
+
+    def get_user_reservation(self, user_id):
+        """Obtiene la reserva de un usuario."""
+        reservation = db.get_reservation(user_id)
+        if reservation:
+            return f"Tienes una reserva para el {reservation['date']} a las {reservation['time']} para {reservation['people']} personas. 😊"
+        return "No tienes ninguna reserva activa en este momento."
+
+    def cancel_reservation(self, user_id):
+        """Cancela la reserva de un usuario."""
+        reservation = db.get_reservation(user_id)
+        if reservation:
+            db.delete_reservation(user_id)
+            return "❌ Tu reserva ha sido cancelada correctamente."
+        return "⚠️ No tienes ninguna reserva activa para cancelar."
 
     def extract_details(self, message):
-        date = re.search(r'(\d{1,2}/\d{1,2}|\d{1,2} de [a-zA-Z]+)', message)
-        time = re.search(r'(\d{1,2}:\d{2}|\d{1,2} (?:AM|PM|am|pm))', message)
-        people = re.search(r'(\d+)\s*(?:personas?|somos|para)', message)
+        """Extrae la fecha, hora y número de personas de un mensaje de reserva."""
+        import re
+        date_match = re.search(r'(\d{1,2}/\d{1,2})|(\d{1,2} de [a-zA-Z]+)', message)
+        time_match = re.search(r'(\d{1,2}[:h]\d{2})|(\d{1,2} (?:AM|PM|am|pm))', message)
+        people_match = re.search(r'(\d+)\s*(?:personas?|somos|para)', message)
 
-        return (date.group(0) if date else None, 
-                time.group(0) if time else None, 
-                people.group(1) if people else None)
+        date_str = date_match.group(0) if date_match else None
+        time_str = time_match.group(0) if time_match else None
+        people_count = people_match.group(1) if people_match else None
 
-    def handle_reservation(self, user_id, message):
-        if user_id not in self.user_reservations:
-            self.user_reservations[user_id] = {"date": None, "time": None, "people": None}
+        return date_str, time_str, people_count
 
-        details = self.extract_details(message)
-        keys = ["date", "time", "people"]
-        
-        for key, value in zip(keys, details):
-            if value and not self.user_reservations[user_id][key]:
-                self.user_reservations[user_id][key] = value
-
-        if all(self.user_reservations[user_id].values()):
-            confirmation = f"✅ Reserva confirmada para {self.user_reservations[user_id]['date']} "\
-                           f"a las {self.user_reservations[user_id]['time']} para "\
-                           f"{self.user_reservations[user_id]['people']} personas."
-            del self.user_reservations[user_id]  # Limpia después de confirmar
-            return confirmation
-        return "Necesito más detalles para completar la reserva."
-
+# Instancia global del gestor de reservas
 reservation_manager = ReservationManager()

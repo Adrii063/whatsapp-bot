@@ -3,13 +3,12 @@ from twilio.twiml.messaging_response import MessagingResponse
 from dotenv import load_dotenv
 import os
 from bot import chat_with_ai
-from reservations import reservation_manager  # 🔹 Se importa correctamente el manejador de reservas
+from reservations import reservation_manager
 
-# Cargar variables de entorno desde .env
+# Cargar variables de entorno
 load_dotenv()
-
-# Configurar API key de OpenAI
 api_key = os.getenv("OPENAI_API_KEY")
+
 if not api_key:
     raise ValueError("❌ ERROR: La variable de entorno OPENAI_API_KEY no está configurada.")
 
@@ -28,48 +27,26 @@ def whatsapp_reply():
 
     # ✅ Consultar reservas activas
     if "qué reservas tengo" in incoming_msg or "tengo alguna reserva" in incoming_msg:
-        if user_id in reservation_manager.user_reservations and all(reservation_manager.user_reservations[user_id].values()):
-            res = reservation_manager.user_reservations[user_id]
-            response_text = f"Tienes una reserva para el {res['date']} a las {res['time']} para {res['people']} personas. 😊"
-        else:
-            response_text = "No tienes ninguna reserva activa en este momento."
-
-        resp = MessagingResponse()
-        resp.message(response_text)
-        return str(resp)
-
+        response_text = reservation_manager.get_user_reservation(user_id)
+    
     # ✅ Cancelar reservas
-    cancel_phrases = ["cancelar", "cancela", "anular", "eliminar reserva", "borra la reserva"]
-    if any(phrase in incoming_msg for phrase in cancel_phrases):
-        if user_id in reservation_manager.user_reservations:
-            del reservation_manager.user_reservations[user_id]
-            response_text = "❌ Tu reserva ha sido cancelada correctamente."
-        else:
-            response_text = "⚠️ No tienes ninguna reserva activa para cancelar."
-        
-        resp = MessagingResponse()
-        resp.message(response_text)
-        return str(resp)
+    elif any(phrase in incoming_msg for phrase in ["cancelar", "cancela", "anular", "eliminar reserva"]):
+        response_text = reservation_manager.cancel_reservation(user_id)
 
     # ✅ Crear una nueva reserva
-    if "reservar" in incoming_msg or "quiero una mesa" in incoming_msg:
-        reservation_response = reservation_manager.handle_reservation(user_id, incoming_msg)
-        if reservation_response:
-            response_text = reservation_response
-        else:
-            response_text = "¿Podrías darme más detalles sobre la reserva?"
-        
-        resp = MessagingResponse()
-        resp.message(response_text)
-        return str(resp)
+    elif "reservar" in incoming_msg or "quiero una mesa" in incoming_msg:
+        response_text = reservation_manager.handle_reservation(user_id, incoming_msg)
 
     # ✅ Conversación con la IA
-    response_text = chat_with_ai(incoming_msg, user_id)
+    else:
+        response_text = chat_with_ai(incoming_msg, user_id)
+
+    # Responder con Twilio
     resp = MessagingResponse()
     resp.message(response_text)
     return str(resp)
 
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 5000))  # Render asigna un puerto dinámicamente
+    port = int(os.getenv("PORT", 5000))
     print(f"🚀 Servidor iniciado en el puerto {port}")
     app.run(host="0.0.0.0", port=port)
