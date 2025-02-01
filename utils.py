@@ -11,6 +11,6 @@ def extract_reservation_details(message):
     time_str = time_match.group(0) if time_match else None
     people_count = people_match.group(1) if people_match else None
 
-    logging.debug(f"📊 Datos extraídos - Fecha: {date_str}, Hora: {time_str}, Personas: {people_count}")
+    logging.info(f"📊 Datos extraídos - Fecha: {date_str}, Hora: {time_str}, Personas: {people_count}")
 
     return date_str, time_str, people_count
