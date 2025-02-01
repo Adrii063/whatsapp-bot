@@ -9,16 +9,10 @@ load_dotenv()
 class Database:
     def __init__(self):
         try:
-            self.conn = psycopg2.connect(
-                dbname=os.getenv("DB_NAME"),
-                user=os.getenv("DB_USER"),
-                password=os.getenv("DB_PASSWORD"),
-                host=os.getenv("DB_HOST"),  # ✅ Usa la URL completa de la base de datos
-                port=os.getenv("DB_PORT")
-            )
-            self.cur = self.conn.cursor(cursor_factory=RealDictCursor)
+            self.conn = psycopg2.connect(os.getenv("DATABASE_URL"), cursor_factory=RealDictCursor)
+            self.cur = self.conn.cursor()
             self.create_table()
-            print("✅ Conexión a la base de datos exitosa.")
+            print("✅ Conexión con la base de datos establecida correctamente.")
         except Exception as e:
             print(f"❌ Error al conectar a la base de datos: {e}")
 
