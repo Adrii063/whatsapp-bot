@@ -51,11 +51,14 @@ def extract_reservation_details(incoming_msg):
         # Verifica si la respuesta contiene "choices" y extrae el JSON generado por la IA
         if "choices" in response_json and response_json["choices"]:
             message_content = response_json["choices"][0]["message"]["content"].strip()
-            logging.debug(f"📩 Respuesta de OpenRouter: {message_content}")
+            logging.debug(f"📩 Respuesta de OpenRouter antes de limpiar: {message_content}")
+
+            # Eliminar posibles etiquetas de bloque de código (```json ... ```)
+            cleaned_content = re.sub(r"```json\n(.*?)\n```", r"\1", message_content, flags=re.DOTALL).strip()
 
             # Intentar convertir la respuesta a JSON
             try:
-                structured_data = json.loads(message_content)
+                structured_data = json.loads(cleaned_content)
                 return structured_data
             except json.JSONDecodeError:
                 logging.error("❌ Error en la respuesta de OpenRouter: No es JSON válido.")
