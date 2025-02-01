@@ -1,32 +1,47 @@
 import logging
+import sys
+
+# Configurar logs para asegurarnos de que se imprimen en Render
+logging.basicConfig(
+    level=logging.DEBUG,  # Cambia a DEBUG para ver todos los logs
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.StreamHandler(sys.stdout)  # Asegura que los logs se envían a Render
+    ]
+)
+
+logging.debug("🚀 Servidor Flask iniciado correctamente")
+
 from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
 from dotenv import load_dotenv
 import os
 from bot import chat_with_ai
 from reservations import reservation_manager
-from db import db  # Asegurar que db está importado
 
 # Cargar variables de entorno
 load_dotenv()
 
-# Configurar logs para ver todo en la consola
-logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
-logging.info("🟢 Iniciando aplicación...")
+api_key = os.getenv("OPENAI_API_KEY")
+
+if not api_key:
+    raise ValueError("❌ ERROR: La variable de entorno OPENAI_API_KEY no está configurada.")
 
 # Inicializar Flask
 app = Flask(__name__)
 
 @app.route("/")
 def home():
+    logging.debug("✅ Endpoint '/' ha sido accedido")
     return "✅ El bot está funcionando correctamente. Usa /whatsapp para interactuar."
 
 @app.route("/whatsapp", methods=["POST"])
 def whatsapp_reply():
+    """Maneja los mensajes de WhatsApp y gestiona reservas y preguntas con IA"""
     incoming_msg = request.values.get("Body", "").strip().lower()
     user_id = request.values.get("From", "")
 
-    logging.info(f"📩 Mensaje recibido de {user_id}: {incoming_msg}")  # Debug inicial
+    logging.debug(f"📩 Mensaje recibido de {user_id}: {incoming_msg}")
 
     # ✅ Consultar reservas activas
     if "qué reservas tengo" in incoming_msg or "tengo alguna reserva" in incoming_msg:
@@ -44,7 +59,7 @@ def whatsapp_reply():
     else:
         response_text = chat_with_ai(incoming_msg, user_id)
 
-    logging.info(f"📤 Respuesta enviada a {user_id}: {response_text}")  # Debug para ver qué responde el bot
+    logging.debug(f"📤 Respuesta enviada a {user_id}: {response_text}")
 
     # Responder con Twilio
     resp = MessagingResponse()
