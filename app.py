@@ -3,7 +3,7 @@ from twilio.twiml.messaging_response import MessagingResponse
 from dotenv import load_dotenv
 import os
 from bot import chat_with_ai
-from reservations import handle_reservation, user_reservations
+from reservations import reservation_manager  # 🔹 Se importa correctamente el manejador de reservas
 
 # Cargar variables de entorno desde .env
 load_dotenv()
@@ -28,8 +28,8 @@ def whatsapp_reply():
 
     # ✅ Consultar reservas activas
     if "qué reservas tengo" in incoming_msg or "tengo alguna reserva" in incoming_msg:
-        if user_id in user_reservations and all(user_reservations[user_id].values()):
-            res = user_reservations[user_id]
+        if user_id in reservation_manager.user_reservations and all(reservation_manager.user_reservations[user_id].values()):
+            res = reservation_manager.user_reservations[user_id]
             response_text = f"Tienes una reserva para el {res['date']} a las {res['time']} para {res['people']} personas. 😊"
         else:
             response_text = "No tienes ninguna reserva activa en este momento."
@@ -41,8 +41,8 @@ def whatsapp_reply():
     # ✅ Cancelar reservas
     cancel_phrases = ["cancelar", "cancela", "anular", "eliminar reserva", "borra la reserva"]
     if any(phrase in incoming_msg for phrase in cancel_phrases):
-        if user_id in user_reservations:
-            del user_reservations[user_id]
+        if user_id in reservation_manager.user_reservations:
+            del reservation_manager.user_reservations[user_id]
             response_text = "❌ Tu reserva ha sido cancelada correctamente."
         else:
             response_text = "⚠️ No tienes ninguna reserva activa para cancelar."
@@ -53,7 +53,7 @@ def whatsapp_reply():
 
     # ✅ Crear una nueva reserva
     if "reservar" in incoming_msg or "quiero una mesa" in incoming_msg:
-        reservation_response = handle_reservation(incoming_msg, user_id)
+        reservation_response = reservation_manager.handle_reservation(user_id, incoming_msg)
         if reservation_response:
             response_text = reservation_response
         else:
