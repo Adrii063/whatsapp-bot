@@ -1,5 +1,8 @@
 import re
 from db import db
+import logging
+
+logging.basicConfig(level=logging.INFO)
 
 class ReservationManager:
     def __init__(self):
@@ -16,27 +19,41 @@ class ReservationManager:
                 people.group(1) if people else None)
 
     def handle_reservation(self, user_id, message):
-        """Procesa una solicitud de reserva y la almacena en la base de datos."""
-        date, time, people = self.extract_details(message)
+        """Gestiona el flujo de reservas y guarda en la base de datos."""
+        logging.info(f"📩 Procesando reserva para {user_id}: {message}")
 
-        if date and time and people:
-            print(f"🔍 Datos extraídos para reserva: Fecha={date}, Hora={time}, Personas={people}")  # 🔍 Debug
-            db.add_reservation(user_id, date, time, people)
-            return f"✅ ¡Reserva confirmada! 📅 {date} 🕛 {time} para {people} personas."
+        if user_id not in self.user_reservations:
+            self.user_reservations[user_id] = {"date": None, "time": None, "people": None}
+
+        details = self.extract_details(message)
+        keys = ["date", "time", "people"]
         
-        return "❌ Por favor, proporciona la fecha, la hora y el número de personas para la reserva."
+        for key, value in zip(keys, details):
+            if value and not self.user_reservations[user_id][key]:
+                self.user_reservations[user_id][key] = value
+
+        reservation_data = self.user_reservations[user_id]
+
+        if all(reservation_data.values()):
+            db.add_reservation(user_id, reservation_data["date"], reservation_data["time"], reservation_data["people"])
+            confirmation = f"✅ Reserva confirmada para {reservation_data['date']} "\
+                           f"a las {reservation_data['time']} para "\
+                           f"{reservation_data['people']} personas. ¡Gracias por reservar en *La Terraza*! 🍽️"
+            del self.user_reservations[user_id]  # Elimina la reserva temporal
+            return confirmation
+        return "Necesito más detalles para completar la reserva."
 
     def get_user_reservation(self, user_id):
-        """Recupera la reserva de un usuario si existe."""
-        reservation = db.get_reservation(user_id)
-        if reservation:
-            return f"📅 Tienes una reserva para {reservation['date']} a las {reservation['time']} para {reservation['people']} personas."
-        return "⚠️ No tienes ninguna reserva activa."
+        """Consulta si el usuario tiene una reserva activa."""
+        reserva = db.get_reservation(user_id)
+        if reserva:
+            return f"🔎 Tienes una reserva para el {reserva['date']} a las {reserva['time']} para {reserva['people']} personas."
+        return "⚠️ No tienes ninguna reserva activa en este momento."
 
     def cancel_reservation(self, user_id):
-        """Elimina la reserva de un usuario."""
+        """Cancela una reserva del usuario."""
         db.delete_reservation(user_id)
         return "❌ Tu reserva ha sido cancelada correctamente."
 
-# Instancia global del manejador de reservas
+# Instancia global del gestor de reservas
 reservation_manager = ReservationManager()
