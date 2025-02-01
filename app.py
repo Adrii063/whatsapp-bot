@@ -1,9 +1,11 @@
 import logging
 import re
+import json
 from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
 from dotenv import load_dotenv
 import os
+import openai
 from reservations import reservation_manager
 
 # Configurar logging
@@ -11,9 +13,34 @@ logging.basicConfig(level=logging.DEBUG)
 
 # Cargar variables de entorno
 load_dotenv()
+api_key = os.getenv("OPENAI_API_KEY")
+openai.api_key = api_key
 
 # Inicializar Flask
 app = Flask(__name__)
+
+def extract_reservation_details(incoming_msg):
+    """Usa GPT para estructurar la información de una reserva"""
+    prompt = f"""
+    Eres un asistente que extrae detalles de reservas en un restaurante.
+    Extrae los siguientes datos del mensaje y devuélvelos en formato JSON:
+    - Fecha de la reserva
+    - Hora
+    - Número de personas
+
+    Si algún dato no está presente, usa `null`.  
+    Mensaje: "{incoming_msg}"
+    """
+
+    response = openai.ChatCompletion.create(
+        model="gpt-4o",
+        messages=[{"role": "system", "content": "Eres un asistente experto en estructurar reservas de restaurantes."},
+                  {"role": "user", "content": prompt}],
+        max_tokens=100
+    )
+
+    structured_data = json.loads(response["choices"][0]["message"]["content"])
+    return structured_data
 
 @app.route("/")
 def home():
@@ -28,11 +55,15 @@ def whatsapp_reply():
 
     logging.debug(f"📩 Mensaje recibido de {user_id}: {incoming_msg}")
 
-    # Detectar si el mensaje es una solicitud de reserva
-    match = re.search(r"(\d{1,2} de \w+|\bmañana\b) a las (\d{1,2}:\d{2}) para (\d+) personas?", incoming_msg)
-    if match:
-        date, time, people = match.groups()
-        logging.debug(f"📝 Datos extraídos: Fecha={date}, Hora={time}, Personas={people}")
+    # Usar IA para extraer datos de reserva
+    reservation_data = extract_reservation_details(incoming_msg)
+
+    if reservation_data["fecha"] and reservation_data["hora"] and reservation_data["personas"]:
+        date = reservation_data["fecha"]
+        time = reservation_data["hora"]
+        people = reservation_data["personas"]
+
+        logging.debug(f"📝 Datos extraídos por IA: Fecha={date}, Hora={time}, Personas={people}")
 
         try:
             reservation_manager.add_reservation(user_id, date, time, int(people))
@@ -46,7 +77,7 @@ def whatsapp_reply():
             logging.error(f"❌ Error al guardar la reserva: {e}")
 
     else:
-        response_text = "No entendí tu solicitud. Por favor, indica la fecha, hora y número de personas."
+        response_text = "No entendí tu solicitud. Por favor, dime la fecha, hora y número de personas."
 
     # Responder con Twilio
     resp = MessagingResponse()
