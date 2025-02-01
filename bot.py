@@ -14,6 +14,22 @@ def chat_with_ai(user_input, user_id):
     conversation_manager.add_message(user_id, "assistant", response)
     return response
 
+def validate_user_input(user_input):
+    """Corrige errores comunes o reformula preguntas antes de enviarlas a la IA."""
+    corrections = {
+        "reserva mesa": "quiero reservar una mesa",
+        "quiero reservar": "quiero reservar una mesa",
+        "menu": "¿Cuál es el menú de hoy?",
+        "hora": "¿Cuál es el horario del restaurante?",
+        "gracias": "¡Gracias! 😊"
+    }
+    
+    for key, correction in corrections.items():
+        if key in user_input:
+            return correction
+    
+    return user_input
+
 @app.route("/")
 def home():
     return "¡El bot está funcionando!"
