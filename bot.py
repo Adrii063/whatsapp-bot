@@ -1,11 +1,18 @@
-from flask import Flask, request
-from twilio.twiml.messaging_response import MessagingResponse
 from ai_client import ai_client
 from conversation import conversation_manager
 from reservations import reservation_manager
+from flask import Flask, request
+from twilio.twiml.messaging_response import MessagingResponse
 from config import PORT
 
 app = Flask(__name__)
+
+def chat_with_ai(user_input, user_id):
+    """Maneja la conversación personalizada para cada usuario"""
+    conversation_manager.add_message(user_id, "user", user_input)
+    response = ai_client.chat(conversation_manager.get_history(user_id))
+    conversation_manager.add_message(user_id, "assistant", response)
+    return response
 
 @app.route("/")
 def home():
@@ -28,9 +35,7 @@ def whatsapp_reply():
 
     # Chat con IA
     else:
-        conversation_manager.add_message(user_id, "user", incoming_msg)
-        response_text = ai_client.chat(conversation_manager.get_history(user_id))
-        conversation_manager.add_message(user_id, "assistant", response_text)
+        response_text = chat_with_ai(incoming_msg, user_id)
 
     print(f"📤 Respuesta a {user_id}: {response_text}")
     
