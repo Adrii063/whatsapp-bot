@@ -20,23 +20,22 @@ class ReservationManager:
         CREATE TABLE IF NOT EXISTS reservations (
             id SERIAL PRIMARY KEY,
             user_id TEXT UNIQUE NOT NULL,
-            fecha TEXT NOT NULL,
-            hora TEXT NOT NULL,
-            personas INTEGER NOT NULL
+            date TEXT NOT NULL,
+            time TEXT NOT NULL,
+            people INTEGER NOT NULL
         )
         """)
         self.conn.commit()
         logging.info("✅ Tabla de reservas verificada/creada.")
 
-    def add_reservation(self, user_id, fecha, hora, personas):
+    def add_reservation(self, user_id, date, time, people):
         """Añade una nueva reserva a la base de datos."""
         try:
             self.cursor.execute("""
-                INSERT INTO reservations (user_id, fecha, hora, personas)
-                VALUES (%s, %s, %s, %s)
-            """, (user_id, fecha, hora, personas))
+                INSERT INTO reservations (user_id, date, time, people) VALUES (%s, %s, %s, %s)
+            """, (user_id, date, time, people))
             self.conn.commit()
-            logging.info(f"📌 Reserva añadida con éxito para {user_id}: {fecha} a las {hora}, {personas} personas.")
+            logging.info(f"📌 Reserva añadida con éxito para {user_id}: {date} a las {time}, {people} people.")
         except psycopg2.IntegrityError:
             self.conn.rollback()
             logging.error("❌ Ya existe una reserva para este usuario.")
