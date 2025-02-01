@@ -7,7 +7,7 @@ class AIClient:
 
     def chat(self, messages):
         response = self.client.chat.completions.create(
-            model="openai/gpt-4o",
+            model="openai/gpt-4o",  # Asegurar que use GPT-4o
             messages=messages,
             max_tokens=300,
             temperature=0.7
