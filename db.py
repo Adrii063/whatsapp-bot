@@ -10,16 +10,15 @@ load_dotenv()
 class Database:
     def __init__(self):
         try:
-            self.conn = psycopg2.connect(
-                dbname=os.getenv("DB_NAME"),
-                user=os.getenv("DB_USER"),
-                password=os.getenv("DB_PASSWORD"),
-                host=os.getenv("DB_HOST"),
-                port=os.getenv("DB_PORT"),
-                sslmode="require"
-            )
+            DATABASE_URL = os.getenv("DATABASE_URL")
+
+            if not DATABASE_URL:
+                raise ValueError("❌ ERROR: La variable de entorno DATABASE_URL no está configurada.")
+
+            self.conn = psycopg2.connect(DATABASE_URL, sslmode="require")
             self.cur = self.conn.cursor(cursor_factory=RealDictCursor)
-            logging.info("✅ Conexión exitosa a la base de datos")
+            
+            logging.info("✅ Conexión exitosa a la base de datos de Render.")
             self.create_table()
         except Exception as e:
             logging.error(f"❌ Error al conectar a la base de datos: {e}")
