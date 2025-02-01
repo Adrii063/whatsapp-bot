@@ -1,27 +1,42 @@
 import logging
 import re
+import os
+import psycopg2
 from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
 from dotenv import load_dotenv
-import os
-from bot import chat_with_ai
-from db import db  # Asegúrate de que `db.py` tenga la función correcta
 
-# Configurar logging para depuración
+# Configurar logging
 logging.basicConfig(level=logging.DEBUG)
 
 # Cargar variables de entorno
 load_dotenv()
-api_key = os.getenv("OPENAI_API_KEY")
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-if not api_key:
-    raise ValueError("❌ ERROR: La variable de entorno OPENAI_API_KEY no está configurada.")
+if not DATABASE_URL:
+    raise ValueError("❌ ERROR: La variable de entorno DATABASE_URL no está configurada.")
+
+# Conectar a la base de datos
+try:
+    conn = psycopg2.connect(DATABASE_URL)
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS reservations (
+            id SERIAL PRIMARY KEY,
+            user_id TEXT,
+            date TEXT,
+            time TEXT,
+            people INTEGER
+        );
+    ''')
+    conn.commit()
+    logging.info("✅ Tabla de reservas verificada/creada.")
+except Exception as e:
+    logging.error(f"❌ Error al conectar a la base de datos: {e}")
+    raise
 
 # Inicializar Flask
 app = Flask(__name__)
-
-# 🔹 Diccionario global para almacenar reservas temporales antes de confirmar
-user_data = {}
 
 @app.route("/")
 def home():
@@ -30,54 +45,33 @@ def home():
 
 @app.route("/whatsapp", methods=["POST"])
 def whatsapp_reply():
-    """Maneja los mensajes de WhatsApp y gestiona reservas y preguntas con IA"""
-    incoming_msg = request.values.get("Body", "").strip()
+    """Maneja los mensajes de WhatsApp y gestiona reservas."""
+    incoming_msg = request.values.get("Body", "").strip().lower()
     user_id = request.values.get("From", "")
 
     logging.debug(f"📩 Mensaje recibido de {user_id}: {incoming_msg}")
 
-    # Detectar si el mensaje es una solicitud de reserva
-    if "reservar" in incoming_msg.lower() or "quiero una mesa" in incoming_msg.lower():
-        match = re.search(r"(\d{1,2} de \w+|\bmañana\b) a las (\d{1,2}:\d{2}) para (\d+) personas?", incoming_msg)
-        if match:
-            date, time, people = match.groups()
-            logging.debug(f"📝 Datos extraídos: Fecha={date}, Hora={time}, Personas={people}")
-
-            # Preguntar por nombre y teléfono
-            response_text = f"Para completar la reserva, dime tu nombre y número de contacto."
-            user_data[user_id] = {"date": date, "time": time, "people": int(people)}
+    # Intentar extraer detalles de la reserva con regex
+    match = re.search(r"(\d{1,2} de \w+|mañana) a las (\d{1,2}:\d{2}) para (\d+) personas?", incoming_msg)
+    
+    if match:
+        date, time, people = match.groups()
+        logging.debug(f"📝 Datos extraídos: Fecha={date}, Hora={time}, Personas={people}")
         
-        else:
-            response_text = "Por favor, dime la fecha y la hora exacta para la reserva."
-
-    elif user_id in user_data:
-        # Procesar segunda parte: recibir nombre y teléfono
-        match = re.search(r"mi nombre es (\w+) y mi número de teléfono es (\d+)", incoming_msg, re.IGNORECASE)
-        if match:
-            name, phone = match.groups()
-            reservation = user_data.pop(user_id)
-
-            try:
-                logging.debug("🔹 Verificando conexión a la base de datos...")
-                db.check_connection()
-
-                logging.debug(f"📝 Guardando reserva: {user_id}, {reservation['date']}, {reservation['time']}, {reservation['people']} personas.")
-                db.add_reservation(user_id, reservation["date"], reservation["time"], reservation["people"])
-                db.commit()  # Confirmar la transacción
-
-                response_text = f"✅ ¡Reserva confirmada para {reservation['people']} personas el {reservation['date']} a las {reservation['time']}! 🎉"
-                logging.info(f"📌 Reserva guardada correctamente para {user_id}")
-
-            except Exception as e:
-                logging.error(f"❌ Error al guardar la reserva: {e}")
-                response_text = "Lo siento, ha ocurrido un error al procesar tu reserva."
-
-        else:
-            response_text = "Formato incorrecto. Envíame tu nombre y teléfono en este formato: 'Mi nombre es [nombre] y mi número de teléfono es [número]'."
-
+        # Guardar en la base de datos
+        try:
+            cursor.execute(
+                "INSERT INTO reservations (user_id, date, time, people) VALUES (%s, %s, %s, %s)",
+                (user_id, date, time, int(people))
+            )
+            conn.commit()
+            response_text = f"✅ ¡Reserva confirmada! Mesa para {people} personas el {date} a las {time}."
+            logging.info(f"📌 Reserva guardada correctamente para {user_id}")
+        except Exception as e:
+            logging.error(f"❌ Error al guardar la reserva: {e}")
+            response_text = "Lo siento, ha ocurrido un error al procesar tu reserva."
     else:
-        # Usar IA si no es una reserva
-        response_text = chat_with_ai(incoming_msg, user_id)
+        response_text = "Por favor, dime la fecha y la hora exacta para la reserva."  
 
     # Responder con Twilio
     resp = MessagingResponse()
