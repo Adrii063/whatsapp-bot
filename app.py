@@ -25,23 +25,30 @@ def whatsapp_reply():
     incoming_msg = request.values.get("Body", "").strip().lower()
     user_id = request.values.get("From", "")
 
+    print(f"📩 Mensaje recibido: {incoming_msg} de {user_id}")  # DEBUG
+
     # ✅ Consultar reservas activas
     if "qué reservas tengo" in incoming_msg or "tengo alguna reserva" in incoming_msg:
+        print("🔍 Se detectó consulta de reservas")  # DEBUG
         response_text = reservation_manager.get_user_reservation(user_id)
     
     # ✅ Cancelar reservas
     elif any(phrase in incoming_msg for phrase in ["cancelar", "cancela", "anular", "eliminar reserva"]):
+        print("❌ Se detectó una cancelación de reserva")  # DEBUG
         response_text = reservation_manager.cancel_reservation(user_id)
 
     # ✅ Crear una nueva reserva
     elif "reservar" in incoming_msg or "quiero una mesa" in incoming_msg:
+        print("📅 Se detectó una solicitud de reserva")  # DEBUG
         response_text = reservation_manager.handle_reservation(user_id, incoming_msg)
 
     # ✅ Conversación con la IA
     else:
+        print("🤖 Se detectó una consulta general a la IA")  # DEBUG
         response_text = chat_with_ai(incoming_msg, user_id)
 
     # Responder con Twilio
+    print(f"📤 Respuesta enviada: {response_text}")  # DEBUG
     resp = MessagingResponse()
     resp.message(response_text)
     return str(resp)
