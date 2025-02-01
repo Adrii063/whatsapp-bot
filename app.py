@@ -32,16 +32,32 @@ def whatsapp_reply():
 
     logging.debug(f"📩 Mensaje recibido de {user_id}: {incoming_msg}")
 
-    # Responder con Twilio
-    resp = MessagingResponse()
-    
-    if "reservar" in incoming_msg or "mesa" in incoming_msg:
-        logging.debug(f"🔍 Detectada intención de reserva en mensaje: {incoming_msg}")
-        response_text = reservation_manager.handle_reservation(user_id, incoming_msg)
+    # ✅ Detectar si el mensaje es una solicitud de reserva
+    if "reservar" in incoming_msg or "quiero una mesa" in incoming_msg:
+        # Intentar extraer detalles de la reserva
+        match = re.search(r"(\d{1,2} de \w+|\bmañana\b) a las (\d{1,2}:\d{2}) para (\d+) personas?", incoming_msg)
+        if match:
+            date, time, people = match.groups()
+            logging.debug(f"📝 Datos extraídos: Fecha={date}, Hora={time}, Personas={people}")
+
+            # Guardar la reserva en la base de datos
+            try:
+                db.add_reservation(user_id, date, time, int(people))
+                response_text = f"✅ ¡Reserva confirmada! Mesa para {people} personas el {date} a las {time}."
+                logging.info(f"📌 Reserva guardada correctamente para {user_id}")
+            except Exception as e:
+                logging.error(f"❌ Error al guardar la reserva: {e}")
+                response_text = "Lo siento, ha ocurrido un error al procesar tu reserva."
+
+        else:
+            response_text = "Por favor, dime la fecha y la hora exacta para la reserva."
+
+    # ✅ Si no es una reserva, usar IA
     else:
         response_text = chat_with_ai(incoming_msg, user_id)
-    
-    logging.debug(f"📤 Respuesta enviada a {user_id}: {response_text}")
+
+    # Responder con Twilio
+    resp = MessagingResponse()
     resp.message(response_text)
     return str(resp)
 
