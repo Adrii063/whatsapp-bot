@@ -31,42 +31,35 @@ def whatsapp_reply():
     """Maneja los mensajes de WhatsApp y gestiona reservas y preguntas con IA"""
     incoming_msg = request.values.get("Body", "").strip().lower()
     user_id = request.values.get("From", "")
-    
+
     logging.debug(f"📩 Mensaje recibido de {user_id}: {incoming_msg}")
 
-    # Inicializar variables de la reserva
-    date, time, people = None, None, None
-    
     # ✅ Detectar si el mensaje es una solicitud de reserva
     if "reservar" in incoming_msg or "quiero una mesa" in incoming_msg:
         match = re.search(r"(\d{1,2} de \w+|\bmañana\b) a las (\d{1,2}:\d{2}) para (\d+) personas?", incoming_msg)
-        
         if match:
             date, time, people = match.groups()
             logging.debug(f"📝 Datos extraídos: Fecha={date}, Hora={time}, Personas={people}")
+
+            try:
+                # **Verificar conexión antes de insertar**
+                logging.debug("🔹 Verificando conexión a la base de datos...")
+                db.check_connection()
+
+                # **Guardar reserva en la base de datos**
+                logging.debug(f"📝 Intentando guardar reserva: {user_id}, {date}, {time}, {people} personas.")
+                db.add_reservation(user_id, date, time, int(people))
+                db.commit()  # **Importante: Confirmar la transacción**
+                
+                response_text = f"✅ ¡Reserva confirmada! Mesa para {people} personas el {date} a las {time}."
+                logging.info(f"📌 Reserva guardada correctamente para {user_id}")
+            except Exception as e:
+                logging.error(f"❌ Error al guardar la reserva: {e}")
+                response_text = "Lo siento, ha ocurrido un error al procesar tu reserva."
+
         else:
-            logging.error("⚠️ No se pudo extraer la fecha, hora o número de personas correctamente.")
             response_text = "Por favor, dime la fecha y la hora exacta para la reserva."
-            resp = MessagingResponse()
-            resp.message(response_text)
-            return str(resp)
 
-        # Verificar que las variables sean válidas antes de guardar la reserva
-        try:
-            if not all([date, time, people]):
-                raise ValueError("🚨 Error: Uno de los valores (fecha, hora, personas) está vacío.")
-            
-            logging.debug(f"🔍 Intentando guardar reserva: Usuario={user_id}, Fecha={date}, Hora={time}, Personas={people}")
-            
-            db.add_reservation(user_id, date, time, int(people))
-            
-            response_text = f"✅ ¡Reserva confirmada! Tu mesa para {people} personas el {date} a las {time} ha sido guardada."
-            logging.info(f"📌 Reserva guardada correctamente para {user_id}")
-
-        except Exception as e:
-            logging.error(f"❌ ERROR AL GUARDAR RESERVA: {e}")
-            response_text = f"⚠️ Ha ocurrido un error al guardar la reserva: {e}"
-    
     # ✅ Si no es una reserva, usar IA
     else:
         response_text = chat_with_ai(incoming_msg, user_id)
