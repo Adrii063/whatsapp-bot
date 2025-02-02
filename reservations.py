@@ -1,12 +1,11 @@
 import psycopg2
 import logging
 import os
-import re
-from datetime import datetime
 from dotenv import load_dotenv
 
 # Cargar variables de entorno
 load_dotenv()
+
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 class ReservationManager:
@@ -29,62 +28,46 @@ class ReservationManager:
         self.conn.commit()
         logging.info("✅ Tabla de reservas verificada/creada.")
 
-    def normalize_date(self, date_text):
-        """Convierte una fecha en formato 'D de mes' o 'D/M' al formato DD/MM/AAAA."""
-        try:
-            meses = {
-                "enero": "01", "febrero": "02", "marzo": "03", "abril": "04",
-                "mayo": "05", "junio": "06", "julio": "07", "agosto": "08",
-                "septiembre": "09", "octubre": "10", "noviembre": "11", "diciembre": "12"
-            }
-
-            # Caso: "D de mes"
-            match = re.match(r"(\d{1,2}) de (\w+)", date_text)
-            if match:
-                day, month_text = match.groups()
-                month = meses.get(month_text.lower(), "01")
-                year = datetime.now().year
-                return f"{int(day):02d}/{month}/{year}"
-
-            # Caso: "D/M" o "DD/MM"
-            match = re.match(r"(\d{1,2})/(\d{1,2})", date_text)
-            if match:
-                day, month = match.groups()
-                year = datetime.now().year
-                return f"{int(day):02d}/{int(month):02d}/{year}"
-
-            # Caso: "D mes" (sin "de")
-            match = re.match(r"(\d{1,2}) (\w+)", date_text)
-            if match:
-                day, month_text = match.groups()
-                month = meses.get(month_text.lower(), "01")
-                year = datetime.now().year
-                return f"{int(day):02d}/{month}/{year}"
-
-            return date_text  # Si no coincide con ningún formato, devolver sin cambios
-
-        except Exception as e:
-            logging.error(f"❌ Error al normalizar la fecha: {e}")
-            return date_text  # Devolver sin cambios en caso de error
-
     def add_reservation(self, user_id, date, time, people):
         """Añade una nueva reserva a la base de datos."""
         try:
-            date = self.normalize_date(date)  # Normalizar fecha antes de insertar
+            # Convertir fecha al formato DD/MM/YYYY
+            formatted_date = self.format_date(date)
 
             self.cursor.execute("""
-                INSERT INTO reservations (user_id, date, time, people) VALUES (%s, %s, %s, %s)
-            """, (user_id, date, time, people))
+                INSERT INTO reservations (user_id, date, time, people)
+                VALUES (%s, %s, %s, %s)
+            """, (user_id, formatted_date, time, people))
+
             self.conn.commit()
-            logging.info(f"📌 Reserva añadida con éxito para {user_id}: {date} a las {time}, {people} personas.")
+            logging.info(f"📌 Reserva añadida con éxito para {user_id}: {formatted_date} a las {time}, {people} personas.")
+            return True
         except psycopg2.IntegrityError:
             self.conn.rollback()
             logging.error("❌ Ya existe una reserva para este usuario.")
-            raise Exception("Este usuario ya tiene una reserva.")
+            return False
         except Exception as e:
             self.conn.rollback()
             logging.error(f"❌ Error al añadir la reserva: {e}")
-            raise e
+            return False
+
+    def format_date(self, date):
+        """Convierte fechas como '2 de febrero' a '02/02/2025'"""
+        import datetime
+
+        try:
+            if " de " in date:
+                day, month = date.split(" de ")
+                months = {
+                    "enero": "01", "febrero": "02", "marzo": "03", "abril": "04",
+                    "mayo": "05", "junio": "06", "julio": "07", "agosto": "08",
+                    "septiembre": "09", "octubre": "10", "noviembre": "11", "diciembre": "12"
+                }
+                return f"{int(day):02}/{months[month]}/2025"
+            return date  # Si ya está en formato correcto
+        except Exception as e:
+            logging.error(f"❌ Error formateando fecha {date}: {e}")
+            return date
 
     def close_connection(self):
         """Cierra la conexión con la base de datos."""
